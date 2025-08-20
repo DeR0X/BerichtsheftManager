@@ -1,0 +1,111 @@
+BERICHTSHEFT VORLAGE
+=====================================
+
+Wochenbericht KW {weekNumber}/{weekYear}
+=====================================
+
+PERSÖNLICHE DATEN:
+------------------
+Name des Auszubildenden: {userName}
+Unternehmen: {userCompany}
+Ausbildungsberuf: [Ihr Ausbildungsberuf]
+Ausbildungsjahr: [1./2./3. Jahr]
+Datum: {currentDate}
+Zeitraum: {weekDateRange}
+
+WOCHE VOM {weekDateRange}:
+==========================
+
+MONTAG:
+-------
+Tätigkeiten:
+{#monday.activities}
+- {.}
+{/monday.activities}
+
+Arbeitszeit: {monday.hours} Stunden
+Besondere Vorkommnisse: _________________________
+
+DIENSTAG:
+---------
+Tätigkeiten:
+{#tuesday.activities}
+- {.}
+{/tuesday.activities}
+
+Arbeitszeit: {tuesday.hours} Stunden
+Besondere Vorkommnisse: _________________________
+
+MITTWOCH:
+---------
+Tätigkeiten:
+{#wednesday.activities}
+- {.}
+{/wednesday.activities}
+
+Arbeitszeit: {wednesday.hours} Stunden
+Besondere Vorkommnisse: _________________________
+
+DONNERSTAG:
+-----------
+Tätigkeiten:
+{#thursday.activities}
+- {.}
+{/thursday.activities}
+
+Arbeitszeit: {thursday.hours} Stunden
+Besondere Vorkommnisse: _________________________
+
+FREITAG:
+--------
+Tätigkeiten:
+{#friday.activities}
+- {.}
+{/friday.activities}
+
+Arbeitszeit: {friday.hours} Stunden
+Besondere Vorkommnisse: _________________________
+
+ZUSAMMENFASSUNG:
+================
+Gesamtstunden der Woche: {totalHours} Stunden
+Durchschnitt pro Tag: {avgHoursPerDay} Stunden
+
+GELERNTES UND ERREICHTES:
+=========================
+Was habe ich diese Woche gelernt?
+_________________________________
+_________________________________
+_________________________________
+
+Welche neuen Fähigkeiten habe ich erworben?
+_________________________________
+_________________________________
+_________________________________
+
+Welche Herausforderungen hatte ich?
+_________________________________
+_________________________________
+_________________________________
+
+NÄCHSTE WOCHE:
+==============
+Was plane ich für die nächste Woche?
+_________________________________
+_________________________________
+_________________________________
+
+Worauf freue ich mich besonders?
+_________________________________
+_________________________________
+
+UNTERSCHRIFTEN:
+===============
+Datum: _________________
+
+Unterschrift Auszubildende/r: _________________
+Unterschrift Ausbilder/in: ___________________
+
+=====================================
+ENDE DES WOCHENBERICHTS
+=====================================

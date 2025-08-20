@@ -1,9 +1,28 @@
 import jsPDF from 'jspdf';
 import { PDFDocument, PDFForm, PDFTextField, PDFCheckBox, PDFDropdown, PDFOptionList } from 'pdf-lib';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Report, Activity, User, DayHours } from '../lib/localStorage';
-import { generateReportFromWordTemplate, convertDocxToPdf } from './docxGenerator';
+import { generateReportFromWordTemplate } from './docxGenerator';
+import pdfMake from 'pdfmake/build/pdfmake';
+
+// pdfmake Fonts dynamisch laden
+let pdfFontsLoaded = false;
+
+const loadPdfFonts = async () => {
+  if (pdfFontsLoaded) return;
+  
+  try {
+    // Fonts komplett deaktivieren um Roboto-Fehler zu vermeiden
+    (pdfMake as any).vfs = {};
+    pdfFontsLoaded = true;
+    console.log('pdfmake Fonts deaktiviert - verwende Standard-Fonts');
+  } catch (error) {
+    console.error('Fehler beim Laden der pdfmake Fonts:', error);
+    // Fallback: Verwende Standard-Fonts
+    (pdfMake as any).vfs = {};
+  }
+};
 
 interface DayActivity {
   day_of_week: number;
@@ -22,9 +41,9 @@ export interface PDFTemplate {
 // Verfügbare PDF-Vorlagen
 export const availableTemplates: PDFTemplate[] = [
   {
-    name: 'Word-Vorlage: Wochenbericht',
-    url: '/templates/wochenbericht_vorlage.docx',
-    description: 'Word-Vorlage für Wochenberichte - wird zu PDF konvertiert',
+    name: 'Berichtsheft Vorlage (Text)',
+    url: '/templates/berichtsheft_vorlage.txt',
+    description: 'Umfassende Berichtsheft-Vorlage mit allen wichtigen Feldern',
     type: 'docx'
   },
   {
@@ -65,23 +84,20 @@ export const generateReportWithTemplate = async (
       // Word-Dokument generieren
       const docxBuffer = await generateReportFromWordTemplate(report, activities, dayHours, user, templateUrl);
       
-      // DOCX zu PDF konvertieren
-      const pdfBuffer = await convertDocxToPdf(docxBuffer);
-      
-      // PDF herunterladen
-      const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
+      // DOCX herunterladen (als Alternative zur PDF)
+      const blob = new Blob([docxBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
       const url = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Wochenbericht_KW${report.week_number}_${report.week_year}_Word_Vorlage.pdf`;
+      link.download = `Wochenbericht_KW${report.week_number}_${report.week_year}_Word_Vorlage.docx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       URL.revokeObjectURL(url);
       
-      console.log('Word-Vorlage erfolgreich zu PDF konvertiert!');
+      console.log('Word-Dokument erfolgreich aus Vorlage generiert!');
       return true;
     }
     
@@ -464,4 +480,119 @@ export const generateCombinedPDF = async (
   });
   
   doc.save(`Alle_Wochenberichte_${user.full_name.replace(/\s+/g, '_')}.pdf`);
+};
+
+// PDF mit pdfmake generieren (Berichtsheft-Stil)
+export const generateBerichtsheftPDF = async (
+  report: Report,
+  activities: Activity[],
+  dayHours: DayHours[],
+  user: User
+): Promise<void> => {
+  try {
+    console.log('Generiere Berichtsheft-PDF mit pdfmake...');
+    
+    // Fonts laden
+    await loadPdfFonts();
+    
+    // Wochendatum-Bereich berechnen
+    const weekStart = new Date(report.week_year, 0, 1 + (report.week_number - 1) * 7);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const weekDateRange = `${format(weekStart, 'dd.MM.', { locale: de })} - ${format(weekEnd, 'dd.MM.yyyy', { locale: de })}`;
+    
+    // Tätigkeiten nach Tagen gruppieren
+    const activitiesByDay = activities.reduce((acc, activity) => {
+      const dayKey = activity.day_of_week;
+      if (!acc[dayKey]) {
+        acc[dayKey] = [];
+      }
+      acc[dayKey].push(activity);
+      return acc;
+    }, {} as Record<number, Activity[]>);
+    
+    // Stunden nach Tagen gruppieren
+    const hoursByDay = dayHours.reduce((acc, dh) => {
+      acc[dh.day_of_week] = (acc[dh.day_of_week] || 0) + dh.hours + (dh.minutes / 60);
+      return acc;
+    }, {} as Record<number, number>);
+    
+    // Gesamtstunden berechnen
+    const totalHours = Object.values(hoursByDay).reduce((sum, hours) => sum + hours, 0);
+    const avgHoursPerDay = totalHours / 5;
+    
+    const docDefinition = {
+      content: [
+        { text: "Berichtsheft – Wochenübersicht", style: "header" },
+        {
+          table: {
+            widths: ["auto", "*", "auto", "*"],
+            body: [
+              ["Name:", user.full_name || "_________________", "Ausbildungsberuf:", "_________________"],
+              ["Ausbildungsjahr:", "____", "Betrieb:", user.company || "_________________"],
+              ["Woche vom:", weekDateRange, "KW:", `${report.week_number}/${report.week_year}`],
+            ],
+          },
+          margin: [0, 20, 0, 20] as [number, number, number, number],
+        },
+        ...["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"].map((day, index) => {
+          const dayOfWeek = index + 1;
+          const dayActivities = activitiesByDay[dayOfWeek] || [];
+          const dayHours = hoursByDay[dayOfWeek] || 0;
+          const dayDate = format(addDays(weekStart, index), 'dd.MM.yyyy', { locale: de });
+          
+          return {
+            table: {
+              widths: ["auto", "*", "auto"],
+              body: [
+                [{ text: day, colSpan: 3, style: "dayHeader" }, {}, {}],
+                ["Datum:", dayDate, `Stunden: ${Math.round(dayHours * 10) / 10}h`],
+                ...dayActivities.map((activity, i) => [`Tätigkeit ${i + 1}:`, activity.activity_text, ""]),
+                ...Array.from({ length: Math.max(0, 5 - dayActivities.length) }).map((_, i) => 
+                  [`Tätigkeit ${dayActivities.length + i + 1}:`, "", ""]
+                ),
+              ],
+            },
+            margin: [0, 10, 0, 10] as [number, number, number, number],
+          };
+        }),
+        {
+          table: {
+            widths: ["auto", "*"],
+            body: [
+              ["Gesamtstunden der Woche:", `${Math.round(totalHours * 10) / 10}h`],
+              ["Durchschnitt pro Tag:", `${Math.round(avgHoursPerDay * 10) / 10}h`],
+            ],
+          },
+          margin: [0, 20, 0, 20] as [number, number, number, number],
+        },
+        { text: "\nUnterschrift Azubi: ____________________", margin: [0, 20, 0, 5] as [number, number, number, number] },
+        { text: "Unterschrift Ausbilder: ____________________" },
+      ],
+      styles: {
+        header: {
+          fontSize: 18,
+          bold: true,
+          alignment: "center" as const,
+          margin: [0, 0, 0, 20] as [number, number, number, number],
+        },
+        dayHeader: {
+          fillColor: "#d9e8fb",
+          bold: true,
+        },
+      },
+      // Keine spezifischen Fonts verwenden
+      defaultStyle: {
+        fontSize: 10
+      }
+    };
+
+    pdfMake.createPdf(docDefinition).download(`Berichtsheft_KW${report.week_number}_${report.week_year}.pdf`);
+    
+    console.log('Berichtsheft-PDF erfolgreich generiert!');
+    
+  } catch (error) {
+    console.error('Fehler beim Generieren der Berichtsheft-PDF:', error);
+    throw error;
+  }
 };

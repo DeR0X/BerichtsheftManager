@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, CheckCircle, AlertCircle, FileText, TrendingUp, BarChart3, List, CalendarDays } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, AlertCircle, FileText, TrendingUp } from 'lucide-react';
 import { getWeek, getYear } from 'date-fns';
 import { db, Report, DayHours } from '../lib/localStorage';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import ReportsPopup from '../components/Dashboard/ReportsPopup';
 
 interface DashboardStats {
   totalReports: number;
@@ -12,14 +10,11 @@ interface DashboardStats {
   submittedReports: number;
   approvedReports: number;
   totalHours: number;
-  currentWeekStatus: 'draft' | 'submitted' | 'approved' | 'none' | 'rejected';
+  currentWeekStatus: 'draft' | 'submitted' | 'approved' | 'none';
 }
-
-type PopupType = 'total' | 'draft' | 'submitted' | 'approved' | null;
 
 const Dashboard: React.FC = () => {
   const { user, profile } = useAuth();
-  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalReports: 0,
     draftReports: 0,
@@ -29,8 +24,6 @@ const Dashboard: React.FC = () => {
     currentWeekStatus: 'none',
   });
   const [loading, setLoading] = useState(true);
-  const [reports, setReports] = useState<any[]>([]);
-  const [popupType, setPopupType] = useState<PopupType>(null);
 
   useEffect(() => {
     loadStats();
@@ -44,29 +37,22 @@ const Dashboard: React.FC = () => {
       const currentYear = getYear(new Date());
 
       // Load reports
-      const userReports = db.getReportsByUserId(user.id);
-      const reportsWithActivities = userReports.map(report => ({
-        ...report,
-        activities: db.getActivitiesByReportId(report.id),
-        dayHours: db.getDayHoursByReportId(report.id),
-      }));
-      
-      setReports(reportsWithActivities);
+      const reports = db.getReportsByUserId(user.id);
       
       let totalHours = 0;
-      userReports.forEach(report => {
+      reports.forEach(report => {
         const dayHours = db.getDayHoursByReportId(report.id);
         const reportHours = dayHours.reduce((sum, dh) => sum + dh.hours + (dh.minutes / 60), 0);
         totalHours += reportHours;
       });
 
-      const currentWeekReport = userReports.find(r => r.week_number === currentWeek && r.week_year === currentYear);
+      const currentWeekReport = reports.find(r => r.week_number === currentWeek && r.week_year === currentYear);
 
       setStats({
-        totalReports: userReports.length,
-        draftReports: userReports.filter(r => r.status === 'draft').length,
-        submittedReports: userReports.filter(r => r.status === 'submitted').length,
-        approvedReports: userReports.filter(r => r.status === 'approved').length,
+        totalReports: reports.length,
+        draftReports: reports.filter(r => r.status === 'draft').length,
+        submittedReports: reports.filter(r => r.status === 'submitted').length,
+        approvedReports: reports.filter(r => r.status === 'approved').length,
         totalHours,
         currentWeekStatus: currentWeekReport?.status || 'none',
       });
@@ -77,93 +63,24 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const openPopup = (type: PopupType) => {
-    setPopupType(type);
-  };
-
-  const closePopup = () => {
-    setPopupType(null);
-  };
-
-  const getFilteredReports = () => {
-    switch (popupType) {
-      case 'draft':
-        return reports.filter(r => r.status === 'draft');
-      case 'submitted':
-        return reports.filter(r => r.status === 'submitted');
-      case 'approved':
-        return reports.filter(r => r.status === 'approved');
-      case 'total':
-      default:
-        return reports;
-    }
-  };
-
-  const getPopupTitle = () => {
-    switch (popupType) {
-      case 'total':
-        return 'Wochenberichte - Alle Berichte';
-      case 'draft':
-        return 'Entwürfe - Bearbeitung erforderlich';
-      case 'submitted':
-        return 'Eingereichte Berichte - Warten auf Genehmigung';
-      case 'approved':
-        return 'Genehmigte Berichte - Abgeschlossen';
-      default:
-        return '';
-    }
-  };
-
-  const handleViewReport = (year: number, week: number) => {
-    navigate(`/reports/${year}/${week}/view`);
-    closePopup();
-  };
-
-  const handleEditReport = (year: number, week: number) => {
-    navigate(`/reports/${year}/${week}/edit`);
-    closePopup();
-  };
-
   const StatCard: React.FC<{
     title: string;
     value: string | number;
     icon: React.ReactNode;
     color: string;
-    onClick?: () => void;
-    description?: string;
-    variant?: 'default' | 'highlight' | 'info';
-  }> = ({ title, value, icon, color, onClick, description, variant = 'default' }) => {
-    const getVariantStyles = () => {
-      switch (variant) {
-        case 'highlight':
-          return 'ring-2 ring-blue-500 ring-opacity-50 shadow-lg';
-        case 'info':
-          return 'border-dashed border-2 border-gray-300 dark:border-gray-600';
-        default:
-          return '';
-      }
-    };
-
-    return (
-      <div 
-        className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-all duration-200 ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]' : ''} ${getVariantStyles()}`}
-        onClick={onClick}
-      >
-        <div className="flex items-center">
-          <div className={`p-3 rounded-lg ${color}`}>
-            {icon}
-          </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-            <p className="text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
-            {description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>
-            )}
-          </div>
+  }> = ({ title, value, icon, color }) => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="flex items-center">
+        <div className={`p-3 rounded-lg ${color}`}>
+          {icon}
+        </div>
+        <div className="ml-4">
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+          <p className="text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -206,7 +123,7 @@ const Dashboard: React.FC = () => {
           {profile?.role === 'azubi' ? 'Mein Dashboard' : 'Ausbilder Dashboard'}
         </h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Übersicht über Ihre Ausbildungsnachweise und Fortschritt
+          Übersicht über Ihre Ausbildungsnachweise
         </p>
       </div>
 
@@ -233,16 +150,13 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Stats Grid */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Wochenberichte"
+          title="Gesamt Berichte"
           value={stats.totalReports}
           icon={<FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
           color="bg-blue-100 dark:bg-blue-900"
-          onClick={() => openPopup('total')}
-          description="Alle Wochenberichte anzeigen"
-          variant="highlight"
         />
         
         <StatCard
@@ -250,8 +164,6 @@ const Dashboard: React.FC = () => {
           value={stats.draftReports}
           icon={<AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />}
           color="bg-yellow-100 dark:bg-yellow-900"
-          onClick={() => openPopup('draft')}
-          description="Noch zu bearbeiten"
         />
         
         <StatCard
@@ -259,8 +171,6 @@ const Dashboard: React.FC = () => {
           value={stats.submittedReports}
           icon={<Clock className="h-6 w-6 text-blue-600 dark:text-blue-400" />}
           color="bg-blue-100 dark:bg-blue-900"
-          onClick={() => openPopup('submitted')}
-          description="Warten auf Genehmigung"
         />
         
         <StatCard
@@ -268,8 +178,6 @@ const Dashboard: React.FC = () => {
           value={stats.approvedReports}
           icon={<CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />}
           color="bg-green-100 dark:bg-green-900"
-          onClick={() => openPopup('approved')}
-          description="Abgeschlossen"
         />
       </div>
 
@@ -283,7 +191,6 @@ const Dashboard: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Gesamtstunden</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalHours}h</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Gesamte Ausbildungszeit</p>
             </div>
           </div>
         </div>
@@ -298,7 +205,6 @@ const Dashboard: React.FC = () => {
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                 {stats.totalReports > 0 ? Math.round(stats.totalHours / stats.totalReports * 10) / 10 : 0}h
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Ø Stunden pro Woche</p>
             </div>
           </div>
         </div>
@@ -309,36 +215,26 @@ const Dashboard: React.FC = () => {
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
           Schnellzugriff
         </h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <button 
-            onClick={() => navigate('/reports')}
-            className="p-6 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 group hover:shadow-md"
-          >
-            <CalendarDays className="h-8 w-8 text-blue-600 dark:text-blue-400 mb-3 group-hover:scale-110 transition-transform" />
-            <p className="font-semibold text-lg text-gray-900 dark:text-white mb-2">Wochenberichte</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Kalender, Übersicht und Verwaltung Ihrer Ausbildungsnachweise</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400 mb-2" />
+            <p className="font-medium text-gray-900 dark:text-white">Neuer Bericht</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Wochenbericht erstellen</p>
           </button>
           
-          <button 
-            onClick={() => openPopup('total')}
-            className="p-6 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 group hover:shadow-md"
-          >
-            <BarChart3 className="h-8 w-8 text-purple-600 dark:text-purple-400 mb-3 group-hover:scale-110 transition-transform" />
-            <p className="font-semibold text-lg text-gray-900 dark:text-white mb-2">Statistiken</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Detaillierte Übersicht und Fortschrittsverfolgung</p>
+          <button className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <Calendar className="h-6 w-6 text-green-600 dark:text-green-400 mb-2" />
+            <p className="font-medium text-gray-900 dark:text-white">Kalender</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Wochenübersicht anzeigen</p>
+          </button>
+          
+          <button className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+            <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400 mb-2" />
+            <p className="font-medium text-gray-900 dark:text-white">Statistiken</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Fortschritt verfolgen</p>
           </button>
         </div>
       </div>
-
-      {/* Reports Popup */}
-      <ReportsPopup
-        isOpen={popupType !== null}
-        onClose={closePopup}
-        reports={getFilteredReports()}
-        title={getPopupTitle()}
-        onViewReport={handleViewReport}
-        onEditReport={handleEditReport}
-      />
     </div>
   );
 };

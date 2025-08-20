@@ -214,20 +214,34 @@ const ReportEditor: React.FC = () => {
       console.log('PDF erfolgreich aus Word-Vorlage generiert!');
       
     } catch (error) {
-      console.error('Fehler beim Generieren der PDF aus Word-Vorlage:', error);
-      
-      // Fallback: Verwende den Standard-PDF-Generator
-      console.log('Verwende Standard-PDF-Generator als Fallback...');
-      
-      const activitiesWithHours = activities.map(activity => {
-        const dayHoursData = getDayHoursForDay(activity.day_of_week);
-        return {
-          ...activity,
-          hours: dayHoursData.hours + (dayHoursData.minutes / 60),
-        };
-      });
-      
-      await generateReportPDF(report, activitiesWithHours, profile);
+      console.error('Fehler beim Generieren der PDF:', error);
+      alert('Fehler beim Generieren der PDF. Bitte versuchen Sie es erneut.');
+    }
+  };
+
+  const testWordTemplate = async () => {
+    if (!report || !profile) return;
+
+    try {
+      const wordTemplateUrl = '/templates/wochenbericht_vorlage.docx';
+      const wordBuffer = await generateReportFromWordTemplate(report, activities as Activity[], dayHours, profile, wordTemplateUrl);
+
+      const blob = new Blob([wordBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Wochenbericht_KW${currentWeekNumber}_${currentWeekYear}_Test.docx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+
+      console.log('Test Word-Vorlage erfolgreich generiert!');
+    } catch (error) {
+      console.error('Fehler beim Generieren der Test-Word-Vorlage:', error);
+      alert('Fehler beim Generieren der Test-Word-Vorlage. Bitte versuchen Sie es erneut.');
     }
   };
 
@@ -284,13 +298,21 @@ const ReportEditor: React.FC = () => {
             </button>
             
             <button
-              onClick={() => saveReport(false)}
-              disabled={saving}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              onClick={testWordTemplate}
+              className="inline-flex items-center px-4 py-2 border border-green-300 dark:border-green-600 rounded-lg shadow-sm text-sm font-medium text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-800/30"
             >
-              <Save className="h-4 w-4 mr-2" />
-              Speichern
+              <Download className="h-4 w-4 mr-2" />
+              Test Word-Vorlage
             </button>
+            
+                         <button
+               onClick={() => saveReport(false)}
+               disabled={saving}
+               className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+             >
+               <Save className="h-4 w-4 mr-2" />
+               Speichern
+             </button>
             
             {report?.status === 'draft' && (
               <button
