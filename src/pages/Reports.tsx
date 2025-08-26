@@ -9,6 +9,7 @@ import { generateCombinedPDF, generateReportWithTemplate, generateReportWithSele
 import { generateReportFromWordTemplate } from '../utils/docxGenerator';
 import Calendar from '../components/Reports/Calendar';
 import TemplateSelector from '../components/Reports/TemplateSelector';
+import WordTemplateManager from '../components/Reports/WordTemplateManager';
 
 type ReportWithActivities = Report & {
   activities: Activity[];
@@ -16,6 +17,7 @@ type ReportWithActivities = Report & {
 };
 
 type ViewMode = 'calendar' | 'table' | 'overview';
+type TemplateMode = 'pdf' | 'word';
 
 const Reports: React.FC = () => {
   const navigate = useNavigate();
@@ -25,6 +27,7 @@ const Reports: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [templateMode, setTemplateMode] = useState<TemplateMode>('pdf');
 
   useEffect(() => {
     loadReports();
@@ -245,15 +248,52 @@ const Reports: React.FC = () => {
       {/* Template Selector */}
       {showTemplateSelector && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <TemplateSelector
-            templates={availableTemplates}
-            selectedTemplate={selectedTemplate}
-            onTemplateSelect={setSelectedTemplate}
-            onPreview={(templateUrl) => {
-              // Öffne Vorlage in neuem Tab
-              window.open(templateUrl, '_blank');
-            }}
-          />
+          <div className="mb-4">
+            <div className="flex items-center space-x-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Vorlagen verwalten
+              </h3>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setTemplateMode('pdf')}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    templateMode === 'pdf'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  PDF-Vorlagen
+                </button>
+                <button
+                  onClick={() => setTemplateMode('word')}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                    templateMode === 'word'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Word-Vorlagen
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          {templateMode === 'pdf' ? (
+            <TemplateSelector
+              templates={availableTemplates}
+              selectedTemplate={selectedTemplate}
+              onTemplateSelect={setSelectedTemplate}
+              onPreview={(templateUrl) => {
+                // Öffne Vorlage in neuem Tab
+                window.open(templateUrl, '_blank');
+              }}
+            />
+          ) : (
+            <WordTemplateManager
+              selectedTemplate={selectedTemplate}
+              onTemplateSelect={setSelectedTemplate}
+            />
+          )}
         </div>
       )}
 

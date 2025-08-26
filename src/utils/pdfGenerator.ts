@@ -5,6 +5,7 @@ import { de } from 'date-fns/locale';
 import { Report, Activity, User, DayHours } from '../lib/localStorage';
 import { generateReportFromWordTemplate } from './docxGenerator';
 import pdfMake from 'pdfmake/build/pdfmake';
+import { testWordTemplate } from './docxGenerator';
 
 // pdfmake Fonts dynamisch laden
 let pdfFontsLoaded = false;
@@ -66,7 +67,10 @@ export const availableTemplates: PDFTemplate[] = [
   }
 ];
 
-// PDF mit Vorlage generieren
+// Word-Template-Test exportieren
+export const testWordTemplateFromPDFGenerator = testWordTemplate;
+
+// Bericht mit Vorlage generieren (unterstützt .docx, .txt und .pdf)
 export const generateReportWithTemplate = async (
   report: Report,
   activities: Activity[],
@@ -77,9 +81,9 @@ export const generateReportWithTemplate = async (
   try {
     console.log(`Verwende Vorlage: ${templateUrl}`);
     
-    // Prüfen, ob es sich um eine Word-Vorlage handelt
-    if (templateUrl.endsWith('.docx')) {
-      console.log('Verarbeite Word-Vorlage...');
+    // Prüfen, ob es sich um eine Word-Vorlage oder Text-Vorlage handelt
+    if (templateUrl.endsWith('.docx') || templateUrl.endsWith('.txt')) {
+      console.log('Verarbeite Word/Text-Vorlage...');
       
       // Word-Dokument generieren
       const docxBuffer = await generateReportFromWordTemplate(report, activities, dayHours, user, templateUrl);
@@ -90,21 +94,25 @@ export const generateReportWithTemplate = async (
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Wochenbericht_KW${report.week_number}_${report.week_year}_Word_Vorlage.docx`;
+      link.download = `Wochenbericht_KW${report.week_number}_${report.week_year}_${templateUrl.endsWith('.txt') ? 'Text' : 'Word'}_Vorlage.docx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       URL.revokeObjectURL(url);
       
-      console.log('Word-Dokument erfolgreich aus Vorlage generiert!');
+      console.log(`${templateUrl.endsWith('.txt') ? 'Text' : 'Word'}-Dokument erfolgreich aus Vorlage generiert!`);
       return true;
     }
     
-    // PDF-Vorlage verarbeiten (bestehende Funktionalität)
+    // PDF-Vorlage verarbeiten (nur für .pdf Dateien)
+    if (!templateUrl.endsWith('.pdf')) {
+      throw new Error(`Unterstützte Vorlagenformate sind .docx, .txt und .pdf. Gefunden: ${templateUrl.split('.').pop()}`);
+    }
+    
     const response = await fetch(templateUrl);
     if (!response.ok) {
-      throw new Error(`Fehler beim Laden der Vorlage: ${response.statusText}`);
+      throw new Error(`Fehler beim Laden der PDF-Vorlage: ${response.statusText}`);
     }
     
     const templateBytes = await response.arrayBuffer();

@@ -1,0 +1,54 @@
+Wochenbericht - Einfache Vorlage
+
+Name: {userName}
+Unternehmen: {userCompany}
+Datum: {currentDate}
+
+Kalenderwoche: {weekNumber}/{weekYear}
+Zeitraum: {weekDateRange}
+
+MONTAG:
+Tätigkeiten:
+{#monday.activities}
+- {.}
+{/monday.activities}
+Arbeitszeit: {monday.hours} Stunden
+
+DIENSTAG:
+Tätigkeiten:
+{#tuesday.activities}
+- {.}
+{/tuesday.activities}
+Arbeitszeit: {tuesday.hours} Stunden
+
+MITTWOCH:
+Tätigkeiten:
+{#wednesday.activities}
+- {.}
+{/wednesday.activities}
+Arbeitszeit: {wednesday.hours} Stunden
+
+DONNERSTAG:
+Tätigkeiten:
+{#thursday.activities}
+- {.}
+{/thursday.activities}
+Arbeitszeit: {thursday.hours} Stunden
+
+FREITAG:
+Tätigkeiten:
+{#friday.activities}
+- {.}
+{/friday.activities}
+Arbeitszeit: {friday.hours} Stunden
+
+ZUSAMMENFASSUNG:
+Gesamtstunden: {totalHours} Stunden
+Durchschnitt pro Tag: {avgHoursPerDay} Stunden
+
+Unterschrift Azubi: ________________
+Unterschrift Ausbilder: ________________
+
+HINWEIS: Diese .txt Datei kann in Microsoft Word geöffnet und als .docx gespeichert werden.
+Die Platzhalter {variable} werden automatisch durch die entsprechenden Daten ersetzt.
+

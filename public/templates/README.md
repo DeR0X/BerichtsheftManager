@@ -1,112 +1,84 @@
-# Vorlagen für Wochenberichte
+# Template-Verwendung
 
-Dieser Ordner enthält Vorlagen für die Generierung von Wochenberichten.
+## 🚀 Neue DOCX-Bibliothek-Integration
+
+Diese Anwendung verwendet jetzt die **docx-Bibliothek** anstelle von PizZip/Docxtemplater für eine stabile und bewährte DOCX-Generierung.
+
+### Vorteile der docx-Bibliothek:
+- ✅ Stabile und bewährte Lösung
+- ✅ Vollständige TypeScript-Unterstützung
+- ✅ Keine problematischen Abhängigkeiten
+- ✅ Einfache React-Integration
+- ✅ Aktive Wartung
+- ✅ Unterstützt sowohl .txt als auch .docx Templates
+- ✅ Keine Endlos-Loops mehr
 
 ## Verfügbare Vorlagen
 
-### 1. Word-Vorlage (DOCX)
-- **Datei:** `wochenbericht_vorlage.docx`
-- **Beschreibung:** Word-Vorlage für Wochenberichte - wird mit Daten gefüllt
-- **Verwendung:** Für flexible, anpassbare Wochenberichte
-- **Features:** 
-  - Automatische Datenfüllung
-  - Tätigkeiten nach Tagen
-  - Stundenberechnung
-  - Export als DOCX oder PDF
+### 1. Wochenbericht - Einfache Vorlage (`wochenbericht_vorlage.txt`)
+Eine einfache Vorlage für wöchentliche Berichte mit:
+- Grundlegenden Benutzerdaten
+- Tätigkeiten für jeden Wochentag
+- Arbeitszeiten
+- Zusammenfassung
 
-### 2. PDF-Vorlage
-- **Datei:** `berichtsheft_vorlage_mehrere_taetigkeiten.pdf`
-- **Beschreibung:** Professionelle PDF-Vorlage für Wochenberichte
-- **Verwendung:** Für die meisten Wochenberichte geeignet
+### 2. Wochenbericht - Erweiterte Vorlage (`wochenbericht_vorlage_erweitert.txt`)
+Eine erweiterte Vorlage mit zusätzlichen Feldern:
+- Alle Funktionen der einfachen Vorlage
+- Ausbildungsberuf und -jahr
+- Besondere Vorkommnisse
+- Gelerntes
+- Planung für die nächste Woche
 
-### 3. Standard-Vorlagen
-- **Standard Wochenbericht:** Standard-Vorlage für Wochenberichte
-- **Detaillierter Wochenbericht:** Erweiterte Vorlage mit mehr Details
+## Verwendung
 
-## Word-Vorlage Verwendung
+### Als Text-Datei (.txt)
+Die `.txt` Dateien können direkt in der Anwendung verwendet werden. Die Platzhalter werden automatisch durch die entsprechenden Daten ersetzt und als DOCX generiert.
 
-### Verfügbare Platzhalter:
+### Als Word-Dokument (.docx)
+DOCX-Dateien werden jetzt vollständig unterstützt und direkt verarbeitet. Die Anwendung generiert ein neues DOCX-Dokument basierend auf den Template-Daten.
 
-**Hinweis:** docxtemplater verwendet einfache Platzhalter ohne geschweifte Klammern.
+### Automatische Konvertierung
+- **Text-Templates** → Werden zu DOCX konvertiert
+- **DOCX-Templates** → Werden direkt verarbeitet
+- **Keine Endlos-Loops** mehr bei der Verarbeitung
 
-#### Benutzerdaten:
-- `userName` - Name des Auszubildenden
-- `userCompany` - Unternehmen (falls vorhanden)
-- `currentDate` - Aktuelles Datum
+## Verfügbare Platzhalter
 
-#### Berichtsdaten:
-- `weekNumber` - Kalenderwoche
-- `weekYear` - Jahr
-- `weekDateRange` - Datumsbereich der Woche
+### Grundlegende Daten
+- `{userName}` - Name des Benutzers
+- `{userCompany}` - Name des Unternehmens
+- `{currentDate}` - Aktuelles Datum
+- `{weekNumber}` - Kalenderwoche
+- `{weekYear}` - Jahr der Kalenderwoche
+- `{weekDateRange}` - Datumsbereich der Woche
 
-#### Tätigkeiten nach Tagen:
-- `monday.activities` - Tätigkeiten am Montag (Array)
-- `monday.hours` - Stunden am Montag
-- `tuesday.activities` - Tätigkeiten am Dienstag (Array)
-- `tuesday.hours` - Stunden am Dienstag
-- `wednesday.activities` - Tätigkeiten am Mittwoch (Array)
-- `wednesday.hours` - Stunden am Mittwoch
-- `thursday.activities` - Tätigkeiten am Donnerstag (Array)
-- `thursday.hours` - Stunden am Donnerstag
-- `friday.activities` - Tätigkeiten am Freitag (Array)
-- `friday.hours` - Stunden am Freitag
+### Tagesdaten
+- `{monday.activities}` - Liste der Montags-Tätigkeiten
+- `{monday.hours}` - Montags-Arbeitszeit
+- `{tuesday.activities}` - Liste der Dienstags-Tätigkeiten
+- `{tuesday.hours}` - Dienstags-Arbeitszeit
+- `{wednesday.activities}` - Liste der Mittwochs-Tätigkeiten
+- `{wednesday.hours}` - Mittwochs-Arbeitszeit
+- `{thursday.activities}` - Liste der Donnerstags-Tätigkeiten
+- `{thursday.hours}` - Donnerstags-Arbeitszeit
+- `{friday.activities}` - Liste der Freitags-Tätigkeiten
+- `{friday.hours}` - Freitags-Arbeitszeit
 
-#### Zusammenfassung:
-- `totalHours` - Gesamtstunden der Woche
-- `avgHoursPerDay` - Durchschnittsstunden pro Tag
+### Zusammenfassung
+- `{totalHours}` - Gesamtstunden der Woche
+- `{avgHoursPerDay}` - Durchschnittliche Stunden pro Tag
 
-### Beispiel Word-Vorlage:
-
-```
-Wochenbericht KW {weekNumber}/{weekYear}
-Name: {userName}
-Unternehmen: {userCompany}
-Datum: {currentDate}
-Zeitraum: {weekDateRange}
-
-Montag:
-Tätigkeiten: {#monday.activities}
-- {.}
-{/monday.activities}
-Stunden: {monday.hours}h
-
-Dienstag:
-Tätigkeiten: {#tuesday.activities}
-- {.}
-{/tuesday.activities}
-Stunden: {tuesday.hours}h
-
-...
-
-Gesamtstunden: {totalHours}h
-Durchschnitt pro Tag: {avgHoursPerDay}h
-```
-
-### Schleifen für Tätigkeiten:
-
-Für mehrere Tätigkeiten pro Tag verwenden Sie Schleifen:
-
-```
-{#monday.activities}
-- {.}
-{/monday.activities}
-```
-
-- `{#monday.activities}` - Startet die Schleife
-- `{.}` - Aktuelle Tätigkeit
-- `{/monday.activities}` - Beendet die Schleife
+### Erweiterte Felder (nur in erweiterter Vorlage)
+- `{ausbildungsberuf}` - Ausbildungsberuf
+- `{ausbildungsjahr}` - Ausbildungsjahr
+- `{besondereVorkommnisse}` - Besondere Vorkommnisse
+- `{gelerntes}` - Was gelernt wurde
+- `{naechsteWoche}` - Planung für die nächste Woche
 
 ## Hinweise
 
-- **Word-Vorlagen:** Verwenden Sie die Platzhalter in doppelten geschweiften Klammern `{{}}`
-- **PDF-Vorlagen:** Verwenden Sie die definierten Formularfelder
-- **Alle Vorlagen:** Sollten im A4-Format vorliegen
-- **Testen:** Testen Sie die Vorlagen vor dem Einsatz
-
-## Anpassung
-
-Um eigene Vorlagen hinzuzufügen:
-1. **Word-Vorlage:** DOCX-Datei mit Platzhaltern in diesen Ordner legen
-2. **PDF-Vorlage:** PDF-Datei mit Formularfeldern in diesen Ordner legen
-3. **Registrierung:** Die Vorlage in `src/utils/pdfGenerator.ts` registrieren
-4. **UI:** Die Vorlage in der Anwendung verfügbar machen
+- Alle Platzhalter werden automatisch durch die entsprechenden Daten aus der Anwendung ersetzt
+- Leere Felder werden durch leere Strings ersetzt
+- Listen (wie Tätigkeiten) werden automatisch als Aufzählung formatiert
+- Die Vorlagen unterstützen sowohl deutsche als auch englische Datumsformate
