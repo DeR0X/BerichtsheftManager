@@ -52,8 +52,8 @@ Besondere Vorkommnisse: {besondereVorkommnisse}
 Gelerntes: {gelerntes}
 Nächste Woche geplant: {naechsteWoche}
 
-Unterschrift Azubi: ________________
-Unterschrift Ausbilder: ________________
+Unterschrift Azubi: {azubiSignature}
+Unterschrift Ausbilder: {ausbilderSignature}
 
 HINWEIS: Diese .txt Datei kann in Microsoft Word geöffnet und als .docx gespeichert werden.
 Die Platzhalter {variable} werden automatisch durch die entsprechenden Daten ersetzt.

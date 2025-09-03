@@ -46,8 +46,8 @@ ZUSAMMENFASSUNG:
 Gesamtstunden: {totalHours} Stunden
 Durchschnitt pro Tag: {avgHoursPerDay} Stunden
 
-Unterschrift Azubi: ________________
-Unterschrift Ausbilder: ________________
+Unterschrift Azubi: {azubiSignature}
+Unterschrift Ausbilder: {ausbilderSignature}
 
 HINWEIS: Diese .txt Datei kann in Microsoft Word geöffnet und als .docx gespeichert werden.
 Die Platzhalter {variable} werden automatisch durch die entsprechenden Daten ersetzt.
