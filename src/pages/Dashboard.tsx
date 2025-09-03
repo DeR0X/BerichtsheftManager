@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, CheckCircle, AlertCircle, FileText, TrendingUp, TestTube, Download, FileDown } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, AlertCircle, FileText, TrendingUp, TestTube } from 'lucide-react';
 import { getWeek, getYear } from 'date-fns';
-import { db, Report, DayHours } from '../lib/localStorage';
+import { db } from '../lib/localStorage';
 import { useAuth } from '../contexts/AuthContext';
 import { testWordTemplate } from '../utils/docxGenerator';
 import ReportsPopup from '../components/Dashboard/ReportsPopup';
@@ -12,8 +12,9 @@ interface DashboardStats {
   draftReports: number;
   submittedReports: number;
   approvedReports: number;
+  needsCorrectionReports: number;
   totalHours: number;
-  currentWeekStatus: 'draft' | 'submitted' | 'approved' | 'none';
+  currentWeekStatus: 'draft' | 'submitted' | 'approved' | 'rejected' | 'needs_correction' | 'none';
 }
 
 const Dashboard: React.FC = () => {
@@ -24,6 +25,7 @@ const Dashboard: React.FC = () => {
     draftReports: 0,
     submittedReports: 0,
     approvedReports: 0,
+    needsCorrectionReports: 0,
     totalHours: 0,
     currentWeekStatus: 'none',
   });
@@ -44,8 +46,9 @@ const Dashboard: React.FC = () => {
       const currentWeek = getWeek(new Date());
       const currentYear = getYear(new Date());
 
-      // Load reports
-      const reports = db.getReportsByUserId(user.id);
+      // Load reports - for Ausbilder, get all reports; for Azubi, get only their own
+      const allReports = db.getReports();
+      const reports = profile?.role === 'ausbilder' ? allReports : db.getReportsByUserId(user.id);
       
       let totalHours = 0;
       reports.forEach(report => {
@@ -54,13 +57,17 @@ const Dashboard: React.FC = () => {
         totalHours += reportHours;
       });
 
-      const currentWeekReport = reports.find(r => r.week_number === currentWeek && r.week_year === currentYear);
+      // For Ausbilder, find any report for current week; for Azubi, find their own
+      const currentWeekReport = profile?.role === 'ausbilder' 
+        ? reports.find(r => r.week_number === currentWeek && r.week_year === currentYear)
+        : reports.find(r => r.week_number === currentWeek && r.week_year === currentYear && r.user_id === user.id);
 
       setStats({
         totalReports: reports.length,
         draftReports: reports.filter(r => r.status === 'draft').length,
         submittedReports: reports.filter(r => r.status === 'submitted').length,
         approvedReports: reports.filter(r => r.status === 'approved').length,
+        needsCorrectionReports: reports.filter(r => r.status === 'needs_correction').length,
         totalHours,
         currentWeekStatus: currentWeekReport?.status || 'none',
       });
@@ -98,6 +105,10 @@ const Dashboard: React.FC = () => {
         return 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900';
       case 'draft':
         return 'text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900';
+      case 'needs_correction':
+        return 'text-orange-600 bg-orange-100 dark:text-orange-400 dark:bg-orange-900';
+      case 'rejected':
+        return 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900';
       default:
         return 'text-gray-600 bg-gray-100 dark:text-gray-400 dark:bg-gray-700';
     }
@@ -111,6 +122,12 @@ const Dashboard: React.FC = () => {
         return 'Eingereicht';
       case 'draft':
         return 'Entwurf';
+      case 'needs_correction':
+        return 'Korrektur erforderlich';
+      case 'rejected':
+        return 'Abgelehnt';
+      case 'all':
+        return 'Alle';
       default:
         return 'Nicht erstellt';
     }
@@ -166,8 +183,16 @@ const Dashboard: React.FC = () => {
   const handleShowReports = (status: string) => {
     if (!user) return;
     
-    const userReports = db.getReportsByUserId(user.id);
-    const filteredReports = userReports.filter(r => r.status === status);
+    // For Ausbilder, get all reports; for Azubi, get only their own
+    const allReports = db.getReports();
+    const userReports = profile?.role === 'ausbilder' ? allReports : db.getReportsByUserId(user.id);
+    let filteredReports;
+    
+    if (status === 'all') {
+      filteredReports = userReports;
+    } else {
+      filteredReports = userReports.filter(r => r.status === status);
+    }
     
     const reportsWithActivities = filteredReports.map(report => ({
       ...report,
@@ -175,8 +200,16 @@ const Dashboard: React.FC = () => {
       dayHours: db.getDayHoursByReportId(report.id),
     }));
     
+    // Sort by week year and week number (descending - newest first)
+    reportsWithActivities.sort((a, b) => {
+      if (a.week_year !== b.week_year) {
+        return b.week_year - a.week_year;
+      }
+      return b.week_number - a.week_number;
+    });
+    
     setPopupReports(reportsWithActivities);
-    setPopupTitle(`${getStatusText(status)} Wochenberichte`);
+    setPopupTitle(status === 'all' ? 'Alle Wochenberichte' : `${getStatusText(status)} Wochenberichte`);
     setShowReportsPopup(true);
   };
 
@@ -202,7 +235,7 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {profile?.role === 'azubi' ? 'Mein Dashboard' : 'Ausbilder Dashboard'}
+          {profile?.role === 'azubi' ? 'Mein Dashboard' : 'Ausbilder Dashboard'} (KW {getWeek(new Date())})
         </h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Übersicht über Ihre Ausbildungsnachweise
@@ -214,7 +247,7 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              Aktuelle Woche (KW {getWeek(new Date())})
+              Aktuelle Woche (KW {getWeek(new Date())}/{getYear(new Date())})
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Status Ihres aktuellen Wochenberichts
@@ -225,6 +258,8 @@ const Dashboard: React.FC = () => {
               {stats.currentWeekStatus === 'approved' && <CheckCircle className="h-4 w-4 mr-1" />}
               {stats.currentWeekStatus === 'submitted' && <Clock className="h-4 w-4 mr-1" />}
               {stats.currentWeekStatus === 'draft' && <FileText className="h-4 w-4 mr-1" />}
+              {stats.currentWeekStatus === 'needs_correction' && <AlertCircle className="h-4 w-4 mr-1" />}
+              {stats.currentWeekStatus === 'rejected' && <AlertCircle className="h-4 w-4 mr-1" />}
               {stats.currentWeekStatus === 'none' && <AlertCircle className="h-4 w-4 mr-1" />}
               {getStatusText(stats.currentWeekStatus)}
             </span>
@@ -248,11 +283,11 @@ const Dashboard: React.FC = () => {
         
         <div 
           className="cursor-pointer transform hover:scale-105 transition-transform"
-          onClick={() => handleShowReports('draft')}
+          onClick={() => handleShowReports('needs_correction')}
         >
           <StatCard
-            title="Entwürfe"
-            value={stats.draftReports}
+            title="Korrekturen"
+            value={stats.needsCorrectionReports}
             icon={<AlertCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />}
             color="bg-yellow-100 dark:bg-yellow-900"
           />
@@ -283,34 +318,65 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Additional Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900">
-              <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Gesamtstunden</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalHours}h</p>
+      {/* Additional Stats - Only for Azubis */}
+      {profile?.role === 'azubi' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900">
+                <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Gesamtstunden</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalHours}h</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-indigo-100 dark:bg-indigo-900">
-              <Calendar className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Durchschnitt/Woche</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                {stats.totalReports > 0 ? Math.round(stats.totalHours / stats.totalReports * 10) / 10 : 0}h
-              </p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-indigo-100 dark:bg-indigo-900">
+                <Calendar className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Durchschnitt/Woche</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+                  {stats.totalReports > 0 ? Math.round(stats.totalHours / stats.totalReports * 10) / 10 : 0}h
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Ausbilder-specific Stats */}
+      {profile?.role === 'ausbilder' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-orange-100 dark:bg-orange-900">
+                <Clock className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Ausstehende Prüfungen</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.submittedReports}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="p-3 rounded-lg bg-red-100 dark:bg-red-900">
+                <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Korrekturen erforderlich</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.needsCorrectionReports}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -318,46 +384,88 @@ const Dashboard: React.FC = () => {
           Schnellzugriff
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <button 
-            onClick={() => navigate('/reports')}
-            className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400 mb-2" />
-            <p className="font-medium text-gray-900 dark:text-white">Neuer Bericht</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Wochenbericht erstellen</p>
-          </button>
-          
-          <button 
-            onClick={() => navigate('/calendar')}
-            className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Calendar className="h-6 w-6 text-green-600 dark:text-green-400 mb-2" />
-            <p className="font-medium text-gray-900 dark:text-white">Kalender</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Wochenübersicht anzeigen</p>
-          </button>
-          
-          <button 
-            onClick={() => navigate('/reports')}
-            className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          >
-            <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400 mb-2" />
-            <p className="font-medium text-gray-900 dark:text-white">Statistiken</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Fortschritt verfolgen</p>
-          </button>
-          
-          <button 
-            onClick={handleTestWordTemplate}
-            disabled={testingTemplate}
-            className="p-4 text-left border border-orange-200 dark:border-orange-600 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <TestTube className="h-6 w-6 text-orange-600 dark:text-orange-400 mb-2" />
-            <p className="font-medium text-gray-900 dark:text-white">
-              {testingTemplate ? 'Teste...' : 'Word-Vorlage testen'}
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {testingTemplate ? 'Bitte warten...' : 'Parameter extrahieren & ausfüllen'}
-            </p>
-          </button>
+          {profile?.role === 'azubi' ? (
+            <>
+              <button 
+                onClick={() => navigate('/reports')}
+                className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">Neuer Bericht</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Wochenbericht erstellen</p>
+              </button>
+              
+              <button 
+                onClick={() => navigate('/calendar')}
+                className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Calendar className="h-6 w-6 text-green-600 dark:text-green-400 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">Kalender</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Wochenübersicht anzeigen</p>
+              </button>
+              
+              <button 
+                onClick={() => navigate('/reports')}
+                className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">Statistiken</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Fortschritt verfolgen</p>
+              </button>
+              
+              <button 
+                onClick={handleTestWordTemplate}
+                disabled={testingTemplate}
+                className="p-4 text-left border border-orange-200 dark:border-orange-600 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <TestTube className="h-6 w-6 text-orange-600 dark:text-orange-400 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {testingTemplate ? 'Teste...' : 'Word-Vorlage testen'}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {testingTemplate ? 'Bitte warten...' : 'Parameter extrahieren & ausfüllen'}
+                </p>
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                onClick={() => handleShowReports('submitted')}
+                className="p-4 text-left border border-blue-200 dark:border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                <Clock className="h-6 w-6 text-blue-600 dark:text-blue-400 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">Einreichungen prüfen</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Ausstehende Berichte bearbeiten</p>
+              </button>
+              
+              <button 
+                onClick={() => handleShowReports('needs_correction')}
+                className="p-4 text-left border border-orange-200 dark:border-orange-600 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+              >
+                <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">Korrekturen</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Berichte mit Korrekturen</p>
+              </button>
+              
+              <button 
+                onClick={() => navigate('/calendar')}
+                className="p-4 text-left border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Calendar className="h-6 w-6 text-green-600 dark:text-green-400 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">Kalender</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Wochenübersicht anzeigen</p>
+              </button>
+              
+              <button 
+                onClick={() => navigate('/students')}
+                className="p-4 text-left border border-purple-200 dark:border-purple-600 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+              >
+                <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">Azubis verwalten</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Azubi-Übersicht (Coming Soon)</p>
+              </button>
+            </>
+          )}
         </div>
       </div>
 

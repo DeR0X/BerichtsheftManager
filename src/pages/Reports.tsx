@@ -101,6 +101,10 @@ const Reports: React.FC = () => {
         return 'Genehmigt';
       case 'submitted':
         return 'Eingereicht';
+      case 'needs_correction':
+        return 'Korrektur erforderlich';
+      case 'rejected':
+        return 'Abgelehnt';
       case 'draft':
         return 'Entwurf';
       default:
@@ -114,6 +118,10 @@ const Reports: React.FC = () => {
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'submitted':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'needs_correction':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       case 'draft':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
       default:
@@ -139,6 +147,8 @@ const Reports: React.FC = () => {
       draft: reports.filter(r => r.status === 'draft').length,
       submitted: reports.filter(r => r.status === 'submitted').length,
       approved: reports.filter(r => r.status === 'approved').length,
+      needs_correction: reports.filter(r => r.status === 'needs_correction').length,
+      rejected: reports.filter(r => r.status === 'rejected').length,
     };
 
     return { totalHours, avgHoursPerWeek, statusCounts };
@@ -599,6 +609,16 @@ const Reports: React.FC = () => {
                                 onClick={() => navigate(`/reports/${report.week_year}/${report.week_number}/edit`)}
                                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition-colors"
                                 title="Bearbeiten"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                            )}
+                            
+                            {report.status === 'needs_correction' && (
+                              <button
+                                onClick={() => navigate(`/reports/${report.week_year}/${report.week_number}/edit`)}
+                                className="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200 transition-colors"
+                                title="Korrigieren"
                               >
                                 <Edit className="h-4 w-4" />
                               </button>

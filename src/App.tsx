@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Reports from './pages/Reports';
 import ReportEditor from './components/Reports/ReportEditor';
 import CalendarPage from './pages/Calendar';
+import Settings from './pages/Settings';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile, loading } = useAuth();

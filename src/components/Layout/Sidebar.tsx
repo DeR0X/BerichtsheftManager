@@ -23,7 +23,7 @@ const Sidebar: React.FC = () => {
       ]
     : [
         { name: 'Dashboard', href: '/dashboard', icon: BarChart },
-        { name: 'Azubi Berichte', href: '/reports', icon: BookOpen },
+        { name: 'Berichte prüfen', href: '/reports', icon: BookOpen },
         { name: 'Freigaben', href: '/approvals', icon: CheckCircle },
         { name: 'Azubis', href: '/students', icon: Users },
         { name: 'Einstellungen', href: '/settings', icon: Settings },

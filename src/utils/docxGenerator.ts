@@ -637,7 +637,7 @@ export const generateReportFromWordTemplate = async (
       new Paragraph({
         children: [
           new TextRun({
-            text: 'Unterschrift Azubi: ________________',
+            text: `Unterschrift Azubi: ${templateData.azubiSignature || '________________'}`,
             size: 12
           })
         ],
@@ -649,7 +649,7 @@ export const generateReportFromWordTemplate = async (
       new Paragraph({
         children: [
           new TextRun({
-            text: 'Unterschrift Ausbilder: ________________',
+            text: `Unterschrift Ausbilder: ${templateData.ausbilderSignature || '________________'}`,
             size: 12
           })
         ],
@@ -886,6 +886,10 @@ const prepareTemplateData = (
     // Gesamtstunden
     totalHours: Math.round(totalHours * 10) / 10,
     avgHoursPerDay: Math.round(avgHoursPerDay * 10) / 10,
+    
+    // Unterschriften
+    azubiSignature: report.azubi_signature || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+    ausbilderSignature: report.ausbilder_signature || '',
   };
 };
 

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Save, Send, ArrowLeft, Plus, Trash2, Download } from 'lucide-react';
+import { Save, Send, ArrowLeft, Plus, Trash2, Download, AlertCircle, CheckCircle, Clock, MessageSquare, Edit3 } from 'lucide-react';
 import { format, startOfWeek, addDays, getWeek, getYear } from 'date-fns';
 import { de } from 'date-fns/locale';
-import { db, Report, Activity, PredefinedActivity, DayHours } from '../../lib/localStorage';
+import { db, Report, Activity, PredefinedActivity, DayHours, ReportFeedback } from '../../lib/localStorage';
 import { useAuth } from '../../contexts/AuthContext';
 import { generateReportPDF } from '../../utils/pdfGenerator';
 import { generateReportFromWordTemplate, generatePDFFromWordTemplate } from '../../utils/docxGenerator';
+import FeedbackManager from './FeedbackManager';
+import SignatureManager from './SignatureManager';
 
 interface DayActivity {
   id?: string;
@@ -25,6 +27,9 @@ const ReportEditor: React.FC = () => {
   const [predefinedActivities, setPredefinedActivities] = useState<PredefinedActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
+  const [latestFeedback, setLatestFeedback] = useState<ReportFeedback | null>(null);
 
   const currentWeekYear = parseInt(weekYear || getYear(new Date()).toString());
   const currentWeekNumber = parseInt(weekNumber || getWeek(new Date()).toString());
@@ -57,6 +62,9 @@ const ReportEditor: React.FC = () => {
           submitted_at: null,
           approved_at: null,
           approved_by: null,
+          rejected_at: null,
+          correction_requested_at: null,
+          signed_at: null,
         });
       }
 
@@ -64,6 +72,10 @@ const ReportEditor: React.FC = () => {
 
       // Load activities
       const reportActivities = db.getActivitiesByReportId(existingReport.id);
+
+      // Load latest feedback
+      const feedback = db.getLatestFeedbackByReportId(existingReport.id);
+      setLatestFeedback(feedback);
 
       // Load day hours
       const reportDayHours = db.getDayHoursByReportId(existingReport.id);
@@ -149,12 +161,52 @@ const ReportEditor: React.FC = () => {
     setSaving(true);
     
     try {
+      const updateData: Partial<Report> = {};
+      
       // Update report status if submitting
       if (submit && report.status === 'draft') {
-        const updatedReport = db.updateReport(report.id, {
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-        });
+        if (profile?.role === 'ausbilder') {
+          // Ausbilder kann Bericht direkt genehmigen
+          updateData.status = 'approved';
+          updateData.approved_at = new Date().toISOString();
+          updateData.approved_by = user.id;
+        } else {
+          // Azubi reicht Bericht ein
+          updateData.status = 'submitted';
+          updateData.submitted_at = new Date().toISOString();
+          
+          // Azubi-Unterschrift hinzufügen
+          if (profile?.signature_image) {
+            updateData.azubi_signature = profile.signature_image;
+          } else {
+            updateData.azubi_signature = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim();
+          }
+        }
+      }
+      
+      // Bei Korrektur-Status wieder auf submitted setzen
+      if (submit && report.status === 'needs_correction') {
+        if (profile?.role === 'ausbilder') {
+          // Ausbilder kann korrigierte Berichte genehmigen
+          updateData.status = 'approved';
+          updateData.approved_at = new Date().toISOString();
+          updateData.approved_by = user.id;
+        } else {
+          // Azubi reicht korrigierten Bericht erneut ein
+          updateData.status = 'submitted';
+          updateData.submitted_at = new Date().toISOString();
+          
+          // Azubi-Unterschrift aktualisieren
+          if (profile?.signature_image) {
+            updateData.azubi_signature = profile.signature_image;
+          } else {
+            updateData.azubi_signature = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim();
+          }
+        }
+      }
+      
+      if (Object.keys(updateData).length > 0) {
+        const updatedReport = db.updateReport(report.id, updateData);
         if (updatedReport) {
           setReport(updatedReport);
         }
@@ -245,6 +297,57 @@ const ReportEditor: React.FC = () => {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case 'submitted':
+        return <Clock className="h-5 w-5 text-blue-600" />;
+      case 'needs_correction':
+        return <AlertCircle className="h-5 w-5 text-yellow-600" />;
+      case 'rejected':
+        return <AlertCircle className="h-5 w-5 text-red-600" />;
+      case 'draft':
+        return <Edit3 className="h-5 w-5 text-gray-600" />;
+      default:
+        return <AlertCircle className="h-5 w-5 text-gray-400" />;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'Genehmigt';
+      case 'submitted':
+        return 'Eingereicht';
+      case 'needs_correction':
+        return 'Korrektur erforderlich';
+      case 'rejected':
+        return 'Abgelehnt';
+      case 'draft':
+        return 'Entwurf';
+      default:
+        return 'Unbekannt';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'submitted':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'needs_correction':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'draft':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    }
+  };
+
   const getDayActivities = (dayOfWeek: number) => {
     return activities.filter(activity => activity.day_of_week === dayOfWeek);
   };
@@ -282,13 +385,41 @@ const ReportEditor: React.FC = () => {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Wochenbericht KW {currentWeekNumber}/{currentWeekYear}
               </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {format(weekStart, 'dd.MM.yyyy', { locale: de })} - {format(addDays(weekStart, 6), 'dd.MM.yyyy', { locale: de })}
-              </p>
+              <div className="flex items-center space-x-4 mt-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {format(weekStart, 'dd.MM.yyyy', { locale: de })} - {format(addDays(weekStart, 6), 'dd.MM.yyyy', { locale: de })}
+                </p>
+                {report && (
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(report.status)}`}>
+                    {getStatusIcon(report.status)}
+                    <span className="ml-1">{getStatusText(report.status)}</span>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           
           <div className="flex items-center space-x-2">
+            {latestFeedback && (
+              <button
+                onClick={() => setShowFeedback(!showFeedback)}
+                className="inline-flex items-center px-4 py-2 border border-yellow-300 dark:border-yellow-600 rounded-lg shadow-sm text-sm font-medium text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-800/30"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Feedback anzeigen
+              </button>
+            )}
+            
+            {profile?.role === 'azubi' && (
+              <button
+                onClick={() => setShowSignature(!showSignature)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <Edit3 className="h-4 w-4 mr-2" />
+                Unterschrift
+              </button>
+            )}
+            
             <button
               onClick={generatePDF}
               className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -305,7 +436,7 @@ const ReportEditor: React.FC = () => {
               Test Word-Vorlage
             </button>
             
-                         <button
+            <button
                onClick={() => saveReport(false)}
                disabled={saving}
                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
@@ -314,19 +445,71 @@ const ReportEditor: React.FC = () => {
                Speichern
              </button>
             
-            {report?.status === 'draft' && (
+            {report && ['draft', 'needs_correction'].includes(report.status) && (
               <button
                 onClick={() => saveReport(true)}
                 disabled={saving}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
               >
                 <Send className="h-4 w-4 mr-2" />
-                Einreichen
+                {profile?.role === 'ausbilder' 
+                  ? (report.status === 'needs_correction' ? 'Korrekturen abschließen' : 'Abschließen')
+                  : (report.status === 'needs_correction' ? 'Erneut einreichen' : 'Einreichen')
+                }
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Korrektur-Hinweis */}
+      {report?.status === 'needs_correction' && latestFeedback && (
+        <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                Korrektur erforderlich
+              </h3>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                {latestFeedback.message}
+              </p>
+              {latestFeedback.field_corrections && latestFeedback.field_corrections.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Spezifische Korrekturen:</p>
+                  <ul className="mt-1 text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside">
+                    {latestFeedback.field_corrections.map((correction, index) => (
+                      <li key={index}>
+                        <strong>{correction.field}:</strong> {correction.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Manager */}
+      {showFeedback && report && (
+        <div className="mb-6">
+          <FeedbackManager 
+            report={report} 
+            onStatusChange={(newStatus) => {
+              setReport(prev => prev ? { ...prev, status: newStatus } : null);
+              setLatestFeedback(db.getLatestFeedbackByReportId(report.id));
+            }}
+          />
+        </div>
+      )}
+
+      {/* Signature Manager */}
+      {showSignature && (
+        <div className="mb-6">
+          <SignatureManager />
+        </div>
+      )}
 
       <div className="space-y-6">
         {[1, 2, 3, 4, 5].map(dayOfWeek => {

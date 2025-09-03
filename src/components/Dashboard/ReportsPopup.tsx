@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Eye, Edit, Download, Clock, CheckCircle, AlertCircle, Calendar, BarChart3, List, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Eye, Edit, Clock, CheckCircle, AlertCircle, Calendar, BarChart3, List, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { Report, Activity, DayHours } from '../../lib/localStorage';
@@ -30,6 +30,20 @@ const ReportsPopup: React.FC<ReportsPopupProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const getStatusIcon = (status: string) => {
@@ -40,6 +54,10 @@ const ReportsPopup: React.FC<ReportsPopupProps> = ({
         return <Clock className="h-4 w-4 text-blue-600" />;
       case 'draft':
         return <AlertCircle className="h-4 w-4 text-yellow-600" />;
+      case 'needs_correction':
+        return <AlertCircle className="h-4 w-4 text-orange-600" />;
+      case 'rejected':
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
       default:
         return <AlertCircle className="h-4 w-4 text-gray-400" />;
     }
@@ -53,6 +71,10 @@ const ReportsPopup: React.FC<ReportsPopupProps> = ({
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       case 'draft':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'needs_correction':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
     }
@@ -66,6 +88,10 @@ const ReportsPopup: React.FC<ReportsPopupProps> = ({
         return 'Eingereicht';
       case 'draft':
         return 'Entwurf';
+      case 'needs_correction':
+        return 'Korrektur erforderlich';
+      case 'rejected':
+        return 'Abgelehnt';
       default:
         return 'Unbekannt';
     }
@@ -90,6 +116,8 @@ const ReportsPopup: React.FC<ReportsPopupProps> = ({
       draft: reports.filter(r => r.status === 'draft').length,
       submitted: reports.filter(r => r.status === 'submitted').length,
       approved: reports.filter(r => r.status === 'approved').length,
+      needs_correction: reports.filter(r => r.status === 'needs_correction').length,
+      rejected: reports.filter(r => r.status === 'rejected').length,
     };
 
     return { totalHours, avgHoursPerWeek, statusCounts };
@@ -179,7 +207,7 @@ const ReportsPopup: React.FC<ReportsPopupProps> = ({
                     <Eye className="h-4 w-4" />
                   </button>
                   
-                  {report.status === 'draft' && (
+                  {(report.status === 'draft' || report.status === 'needs_correction') && (
                     <button
                       onClick={() => onEditReport(report.week_year, report.week_number)}
                       className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
@@ -252,6 +280,20 @@ const ReportsPopup: React.FC<ReportsPopupProps> = ({
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Korrektur erforderlich</span>
+            </div>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">{stats.statusCounts.needs_correction}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Abgelehnt</span>
+            </div>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">{stats.statusCounts.rejected}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
               <span className="text-sm text-gray-600 dark:text-gray-400">Genehmigt</span>
             </div>
@@ -280,8 +322,8 @@ const ReportsPopup: React.FC<ReportsPopupProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl max-h-[90vh] overflow-hidden m-4">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">

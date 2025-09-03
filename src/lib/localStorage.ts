@@ -4,6 +4,9 @@ export interface User {
   full_name: string;
   role: 'azubi' | 'ausbilder';
   company?: string;
+  signature_image?: string; // Base64 encoded image or null
+  first_name?: string;
+  last_name?: string;
   created_at: string;
 }
 
@@ -12,12 +15,27 @@ export interface Report {
   user_id: string;
   week_year: number;
   week_number: number;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'needs_correction';
   submitted_at: string | null;
   approved_at: string | null;
   approved_by: string | null;
+  rejected_at: string | null;
+  correction_requested_at: string | null;
+  azubi_signature?: string; // Base64 image or text signature
+  ausbilder_signature?: string; // Base64 image or text signature
+  signed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ReportFeedback {
+  id: string;
+  report_id: string;
+  feedback_type: 'correction' | 'approval' | 'rejection';
+  message: string;
+  field_corrections?: { field: string; message: string }[]; // Spezifische Feldkorrekturen
+  created_by: string; // User ID des Ausbilders
+  created_at: string;
 }
 
 export interface Activity {
@@ -70,14 +88,39 @@ class LocalStorageDB {
 
   createUser(userData: Omit<User, 'id' | 'created_at'>): User {
     const users = this.getUsers();
+    
+    // Namen aufteilen wenn full_name vorhanden ist
+    const nameParts = userData.full_name?.split(' ') || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
     const newUser: User = {
       ...userData,
       id: this.generateId(),
+      first_name: firstName,
+      last_name: lastName,
       created_at: this.getCurrentTimestamp(),
     };
     users.push(newUser);
     this.saveUsers(users);
     return newUser;
+  }
+
+  updateUser(id: string, updates: Partial<User>): User | null {
+    const users = this.getUsers();
+    const index = users.findIndex(user => user.id === id);
+    if (index === -1) return null;
+
+    // Namen aufteilen wenn full_name aktualisiert wird
+    if (updates.full_name) {
+      const nameParts = updates.full_name.split(' ');
+      updates.first_name = nameParts[0] || '';
+      updates.last_name = nameParts.slice(1).join(' ') || '';
+    }
+
+    users[index] = { ...users[index], ...updates };
+    this.saveUsers(users);
+    return users[index];
   }
 
   getUserByEmail(email: string): User | null {
@@ -226,6 +269,40 @@ class LocalStorageDB {
     const dayHours = this.getDayHours();
     const filteredDayHours = dayHours.filter(dh => dh.report_id !== reportId);
     this.saveDayHours(filteredDayHours);
+  }
+
+  // Report Feedback
+  getReportFeedback(): ReportFeedback[] {
+    const feedback = localStorage.getItem('report_feedback');
+    return feedback ? JSON.parse(feedback) : [];
+  }
+
+  saveReportFeedback(feedback: ReportFeedback[]): void {
+    localStorage.setItem('report_feedback', JSON.stringify(feedback));
+  }
+
+  createReportFeedback(feedbackData: Omit<ReportFeedback, 'id' | 'created_at'>): ReportFeedback {
+    const feedback = this.getReportFeedback();
+    const newFeedback: ReportFeedback = {
+      ...feedbackData,
+      id: this.generateId(),
+      created_at: this.getCurrentTimestamp(),
+    };
+    feedback.push(newFeedback);
+    this.saveReportFeedback(feedback);
+    return newFeedback;
+  }
+
+  getFeedbackByReportId(reportId: string): ReportFeedback[] {
+    const feedback = this.getReportFeedback();
+    return feedback.filter(f => f.report_id === reportId).sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }
+
+  getLatestFeedbackByReportId(reportId: string): ReportFeedback | null {
+    const feedback = this.getFeedbackByReportId(reportId);
+    return feedback.length > 0 ? feedback[0] : null;
   }
 
   // Predefined Activities
